@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coisa boa food game</title>
+    <!-- Carrega o Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Fonte personalizada */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #7f1d1d; /* bg-red-900 */
+        }
+        
+        /* Oculta telas por padrão */
+        .game-screen {
+            display: none;
+        }
+
+        /* --- Estilos Jogo 1 --- */
+        .pizza-ingrediente {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            font-size: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+            user-select: none;
+        }
+        @keyframes feedback-anim {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.2); opacity: 0; }
+        }
+        .feedback {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+            animation: feedback-anim 1s ease-out forwards;
+        }
+
+        /* --- Estilos Jogo 2 --- */
+        #game-2-canvas {
+            background: #fff3cd; /* bg-yellow-100 */
+            border-radius: 0.5rem;
+            cursor: none;
+        }
+
+        /* --- Estilos Jogo 3 --- */
+        #game-3-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+        }
+        .card {
+            aspect-ratio: 1 / 1;
+            background-color: #fca5a5; /* bg-red-300 */
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            transition: transform 0.5s;
+            user-select: none;
+        }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.5s;
+            transform-style: preserve-3d;
+        }
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.5rem;
+        }
+        .card-front {
+            background-color: #fca5a5; /* bg-red-300 */
+            font-size: 3rem;
+        }
+        .card-back {
+            background-color: #fef08a; /* bg-yellow-200 */
+            transform: rotateY(180deg);
+        }
+        .card.matched {
+            opacity: 0.5;
+            background-color: #a7f3d0; /* bg-green-200 */
+            cursor: default;
+        }
+    </style>
+</head>
+<body class="flex items-start justify-center p-4 min-h-screen">
+
+    <!-- Container Principal do Jogo -->
+    <div id="game-container" class="bg-yellow-50 max-w-md w-full mx-auto rounded-xl shadow-2xl p-6 text-gray-800">
+
+        <!-- ====================================================== -->
+        <!-- =================== HUB PRINCIPAL ==================== -->
+        <!-- ====================================================== -->
+        <div id="hub-screen" class="game-screen text-center" style="display: block;">
+            <h1 class="text-5xl font-bold text-red-600 mb-6">Arcade da Pizzaria</h1>
+            <p class="text-lg mb-8">Escolha um jogo abaixo para começar:</p>
+
+            <!-- Card Jogo 1 -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h2 class="text-3xl font-bold text-green-600 mb-2">Pizzaria Maluca</h2>
+                <p class="mb-4">Monte as pizzas corretas o mais rápido que puder antes que o tempo acabe!</p>
+                <button onclick="startGame(1)" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition duration-200">
+                    Jogar!
+                </button>
+            </div>
+
+            <!-- Card Jogo 2 -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h2 class="text-3xl font-bold text-blue-600 mb-2">Apanhador de Pizzas</h2>
+                <p class="mb-4">Apanhe as fatias de pizza que caem, mas cuidado com as bombas! Mova o mouse ou o dedo.</p>
+                <button onclick="startGame(2)" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition duration-200">
+                    Jogar!
+                </button>
+            </div>
+
+            <!-- Card Jogo 3 -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-3xl font-bold text-purple-600 mb-2">Memória de Ingredientes</h2>
+                <p class="mb-4">Encontre todos os pares de ingredientes virando as cartas. Teste sua memória!</p>
+                <button onclick="startGame(3)" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition duration-200">
+                    Jogar!
+                </button>
+            </div>
+        </div>
+
+        <!-- ====================================================== -->
+        <!-- ===================== JOGO 1 ========================= -->
+        <!-- ====================================================== -->
+        <div id="game-1-screen" class="game-screen">
+            <!-- Header: Pontos e Tempo -->
+            <div class="flex justify-between items-center mb-4">
+                <div class="text-left">
+                    <span class="text-sm font-medium text-gray-500">PONTOS</span>
+                    <div id="score1" class="text-3xl font-bold text-green-600">0</div>
+                </div>
+                <button class="back-to-hub-btn text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded shadow">Menu</button>
+                <div class="text-right">
+                    <span class="text-sm font-medium text-gray-500">TEMPO</span>
+                    <div id="timer1" class="text-3xl font-bold text-red-600">60</div>
+                </div>
+            </div>
+            <!-- Área do Pedido -->
+            <div class="bg-white rounded-lg p-4 mb-4 shadow">
+                <h2 class="text-center font-bold text-lg mb-2">Pedido do Cliente:</h2>
+                <div id="order-display1" class="flex justify-center space-x-2 text-4xl"></div>
+            </div>
+            <!-- Área de Montagem da Pizza -->
+            <div class="relative w-full aspect-square flex items-center justify-center mb-4">
+                <div id="pizza-base1" class="w-10/12 aspect-square bg-yellow-400 rounded-full shadow-inner border-8 border-yellow-600"></div>
+                <div id="feedback-display1"></div>
+            </div>
+            <!-- Botões de Ingredientes -->
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <button data-ingredient="pepperoni" class="ingredient-btn1 bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded-lg shadow text-2xl">🍕</button>
+                <button data-ingredient="mushroom" class="ingredient-btn1 bg-gray-400 hover:bg-gray-500 text-white py-3 px-4 rounded-lg shadow text-2xl">🍄</button>
+                <button data-ingredient="onion" class="ingredient-btn1 bg-purple-400 hover:bg-purple-500 text-white py-3 px-4 rounded-lg shadow text-2xl">🧅</button>
+                <button data-ingredient="cheese" class="ingredient-btn1 bg-yellow-300 hover:bg-yellow-400 text-gray-800 py-3 px-4 rounded-lg shadow text-2xl">🧀</button>
+                <button data-ingredient="tomato" class="ingredient-btn1 bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg shadow text-2xl">🍅</button>
+                <button data-ingredient="olive" class="ingredient-btn1 bg-green-800 hover:bg-green-900 text-white py-3 px-4 rounded-lg shadow text-2xl">🫒</button>
+            </div>
+            <!-- Botões de Ação -->
+            <div class="grid grid-cols-2 gap-3">
+                <button id="clear-pizza1" class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold py-3 px-4 rounded-lg shadow">Limpar</button>
+                <button id="serve-pizza1" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow">Servir!</button>
+            </div>
+        </div>
+        <!-- Tela Fim Jogo 1 -->
+        <div id="game-1-over-screen" class="game-screen text-center">
+            <h1 class="text-4xl font-bold text-red-600 mb-4">Tempo Esgotado!</h1>
+            <p class="text-2xl mb-2">Sua pontuação final foi:</p>
+            <div id="final-score1" class="text-6xl font-bold text-green-600 mb-8">0</div>
+            <button onclick="startGame(1)" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-lg text-xl shadow-lg mb-4">
+                Jogar Novamente
+            </button>
+            <button class="back-to-hub-btn w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg">
+                Voltar ao Menu
+            </button>
+        </div>
+
+
+        <!-- ====================================================== -->
+        <!-- ===================== JOGO 2 ========================= -->
+        <!-- ====================================================== -->
+        <div id="game-2-screen" class="game-screen">
+            <!-- Header: Pontos e Tempo -->
+            <div class="flex justify-between items-center mb-4">
+                <div class="text-left">
+                    <span class="text-sm font-medium text-gray-500">PONTOS</span>
+                    <div id="score2" class="text-3xl font-bold text-blue-600">0</div>
+                </div>
+                <button class="back-to-hub-btn text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded shadow">Menu</button>
+                <div class="text-right">
+                    <span class="text-sm font-medium text-gray-500">TEMPO</span>
+                    <div id="timer2" class="text-3xl font-bold text-red-600">60</div>
+                </div>
+            </div>
+            <!-- Canvas do Jogo -->
+            <canvas id="game-2-canvas" width="400" height="400"></canvas>
+        </div>
+        <!-- Tela Fim Jogo 2 -->
+        <div id="game-2-over-screen" class="game-screen text-center">
+            <h1 class="text-4xl font-bold text-red-600 mb-4">Fim de Jogo!</h1>
+            <p class="text-2xl mb-2">Sua pontuação final foi:</p>
+            <div id="final-score2" class="text-6xl font-bold text-blue-600 mb-8">0</div>
+            <button onclick="startGame(2)" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-lg text-xl shadow-lg mb-4">
+                Jogar Novamente
+            </button>
+            <button class="back-to-hub-btn w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg">
+                Voltar ao Menu
+            </button>
+        </div>
+
+
+        <!-- ====================================================== -->
+        <!-- ===================== JOGO 3 ========================= -->
+        <!-- ====================================================== -->
+        <div id="game-3-screen" class="game-screen">
+            <!-- Header: Pares e Tentativas -->
+            <div class="flex justify-between items-center mb-4">
+                <div class="text-left">
+                    <span class="text-sm font-medium text-gray-500">PARES</span>
+                    <div id="pairs3" class="text-3xl font-bold text-purple-600">0 / 6</div>
+                </div>
+                <button class="back-to-hub-btn text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded shadow">Menu</button>
+                <div class="text-right">
+                    <span class="text-sm font-medium text-gray-500">TENTATIVAS</span>
+                    <div id="tries3" class="text-3xl font-bold text-red-600">0</div>
+                </div>
+            </div>
+            <!-- Grid do Jogo da Memória -->
+            <div id="game-3-grid" class="mb-4">
+                <!-- Cartas serão geradas pelo JS -->
+            </div>
+            <div id="game-3-message" class="text-center text-2xl font-bold text-green-600 h-8"></div>
+        </div>
+        <!-- Tela Fim Jogo 3 -->
+        <div id="game-3-over-screen" class="game-screen text-center">
+            <h1 class="text-4xl font-bold text-green-600 mb-4">Parabéns!</h1>
+            <p class="text-2xl mb-2">Você encontrou todos os pares em:</p>
+            <div id="final-tries3" class="text-6xl font-bold text-purple-600 mb-8">0</div>
+            <p class="text-2xl mb-8">tentativas!</p>
+            <button onclick="startGame(3)" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-4 px-6 rounded-lg text-xl shadow-lg mb-4">
+                Jogar Novamente
+            </button>
+            <button class="back-to-hub-btn w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg">
+                Voltar ao Menu
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // ===================================================================
+        // =================== CONTROLE GERAL E NAVEGAÇÃO ====================
+        // ===================================================================
+
+        const allScreens = document.querySelectorAll('.game-screen');
+        const backToHubButtons = document.querySelectorAll('.back-to-hub-btn');
+
+        // Referências dos loops de jogo para parar
+        let gameInterval1 = null;
+        let gameInterval2 = null; // requestAnimationFrame ID
+        let gameInterval3 = null; // Timer (se houver)
+
+        function showScreen(screenId) {
+            stopAllGames(); // Para todos os jogos antes de trocar de tela
+            allScreens.forEach(s => s.style.display = 'none');
+            document.getElementById(screenId).style.display = 'block';
+        }
+
+        function startGame(gameId) {
+            if (gameId === 1) {
+                showScreen('game-1-screen');
+                initGame1();
+            } else if (gameId === 2) {
+                showScreen('game-2-screen');
+                initGame2();
+            } else if (gameId === 3) {
+                showScreen('game-3-screen');
+                initGame3();
+            }
+        }
+
+        function stopAllGames() {
+            // Para Jogo 1
+            if (gameInterval1) {
+                clearInterval(gameInterval1);
+                gameInterval1 = null;
+            }
+            // Para Jogo 2
+            if (gameInterval2) {
+                cancelAnimationFrame(gameInterval2);
+                gameInterval2 = null;
+            }
+            // Para Jogo 3 (se tiver timer)
+            if (gameInterval3) {
+                clearInterval(gameInterval3);
+                gameInterval3 = null;
+            }
+        }
+
+        // Event listener para todos os botões "Voltar ao Menu"
+        backToHubButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                showScreen('hub-screen');
+            });
+        });
+
+        // ===================================================================
+        // ======================== JOGO 1: PIZZARIA MALUCA ==================
+        // ===================================================================
+        
+        // Elementos Jogo 1
+        const scoreDisplay1 = document.getElementById('score1');
+        const timerDisplay1 = document.getElementById('timer1');
+        const orderDisplay1 = document.getElementById('order-display1');
+        const pizzaBase1 = document.getElementById('pizza-base1');
+        const feedbackDisplay1 = document.getElementById('feedback-display1');
+        const finalScoreDisplay1 = document.getElementById('final-score1');
+        const clearPizzaButton1 = document.getElementById('clear-pizza1');
+        const servePizzaButton1 = document.getElementById('serve-pizza1');
+        
+        const INGREDIENTS1 = {
+            'pepperoni': '🍕',
+            'mushroom': '🍄',
+            'onion': '🧅',
+            'cheese': '🧀',
+            'tomato': '🍅',
+            'olive': '🫒'
+        };
+        const INGREDIENT_KEYS1 = Object.keys(INGREDIENTS1);
+        
+        let score1 = 0;
+        let timer1 = 60;
+        let currentOrder1 = [];
+        let currentPizza1 = [];
+
+        function initGame1() {
+            score1 = 0;
+            timer1 = 60;
+            scoreDisplay1.textContent = score1;
+            timerDisplay1.textContent = timer1;
+            
+            generateNewOrder1();
+            gameInterval1 = setInterval(gameLoop1, 1000);
+        }
+
+        function gameLoop1() {
+            timer1--;
+            timerDisplay1.textContent = timer1;
+            if (timer1 <= 0) {
+                endGame1();
+            }
+        }
+
+        function endGame1() {
+            clearInterval(gameInterval1);
+            gameInterval1 = null;
+            finalScoreDisplay1.textContent = score1;
+            showScreen('game-1-over-screen');
+        }
+
+        function generateNewOrder1() {
+            currentOrder1 = [];
+            const orderCount = Math.floor(Math.random() * 3) + 2; // 2-4 ingredientes
+            for (let i = 0; i < orderCount; i++) {
+                const randomIngredient = INGREDIENT_KEYS1[Math.floor(Math.random() * INGREDIENT_KEYS1.length)];
+                currentOrder1.push(randomIngredient);
+            }
+            updateOrderDisplay1();
+            clearPizza1();
+        }
+
+        function updateOrderDisplay1() {
+            orderDisplay1.innerHTML = '';
+            const counts = {};
+            currentOrder1.forEach(item => { counts[item] = (counts[item] || 0) + 1; });
+            for (const ingredient in counts) {
+                const count = counts[ingredient];
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'flex flex-col items-center';
+                itemDiv.innerHTML = `<span class="text-4xl">${INGREDIENTS1[ingredient]}</span> ${count > 1 ? `<span class="text-sm font-bold text-gray-700">x${count}</span>` : ''}`;
+                orderDisplay1.appendChild(itemDiv);
+            }
+        }
+
+        function addIngredient1(ingredient) {
+            if (currentPizza1.length >= 8) return;
+            currentPizza1.push(ingredient);
+            
+            const ingredientEmoji = document.createElement('div');
+            ingredientEmoji.className = 'pizza-ingrediente';
+            ingredientEmoji.textContent = INGREDIENTS1[ingredient];
+            
+            const pizzaRect = pizzaBase1.getBoundingClientRect();
+            const iconSizeOffset = 30;
+            const pizzaRadius = (pizzaRect.width / 2) * 0.7;
+            const angle = Math.random() * 2 * Math.PI;
+            const x = Math.cos(angle) * pizzaRadius + (pizzaRect.width / 2) - iconSizeOffset;
+            const y = Math.sin(angle) * pizzaRadius + (pizzaRect.height / 2) - iconSizeOffset;
+            ingredientEmoji.style.left = `${x}px`;
+            ingredientEmoji.style.top = `${y}px`;
+            pizzaBase1.appendChild(ingredientEmoji);
+        }
+
+        function clearPizza1() {
+            currentPizza1 = [];
+            pizzaBase1.innerHTML = '';
+        }
+
+        function servePizza1() {
+            const sortedPizza = [...currentPizza1].sort();
+            const sortedOrder = [...currentOrder1].sort();
+            if (JSON.stringify(sortedPizza) === JSON.stringify(sortedOrder)) {
+                score1 += 10;
+                showFeedback1(true);
+                generateNewOrder1();
+            } else {
+                score1 = Math.max(0, score1 - 5);
+                showFeedback1(false);
+                clearPizza1();
+            }
+            scoreDisplay1.textContent = score1;
+        }
+
+        function showFeedback1(correct) {
+            feedbackDisplay1.innerHTML = '';
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.textContent = correct ? '✅' : '❌';
+            feedback.style.color = correct ? 'green' : 'red';
+            feedbackDisplay1.appendChild(feedback);
+            setTimeout(() => { feedback.remove(); }, 1000);
+        }
+
+        // Event Listeners Jogo 1
+        document.querySelectorAll('.ingredient-btn1').forEach(button => {
+            button.addEventListener('click', () => {
+                addIngredient1(button.dataset.ingredient);
+            });
+        });
+        clearPizzaButton1.addEventListener('click', clearPizza1);
+        servePizzaButton1.addEventListener('click', servePizza1);
+
+
+        // ===================================================================
+        // ======================== JOGO 2: APANHADOR DE PIZZA ==============
+        // ===================================================================
+        
+        const canvas2 = document.getElementById('game-2-canvas');
+        const ctx2 = canvas2.getContext('2d');
+        const scoreDisplay2 = document.getElementById('score2');
+        const timerDisplay2 = document.getElementById('timer2');
+        const finalScoreDisplay2 = document.getElementById('final-score2');
+
+        let score2 = 0;
+        let timer2 = 60;
+        let player2 = { x: 180, y: 360, width: 80, height: 20 };
+        let items2 = [];
+        let spawnTimer2 = 0;
+        let gameActive2 = false;
+
+        function initGame2() {
+            score2 = 0;
+            timer2 = 60;
+            scoreDisplay2.textContent = score2;
+            timerDisplay2.textContent = timer2;
+            player2.x = 180;
+            items2 = [];
+            gameActive2 = true;
+
+            // Inicia o timer
+            gameInterval3 = setInterval(() => { // Re-usa o gameInterval3 para o timer
+                if (!gameActive2) return;
+                timer2--;
+                timerDisplay2.textContent = timer2;
+                if (timer2 <= 0) {
+                    endGame2(true); // Ganhou (tempo acabou)
+                }
+            }, 1000);
+
+            // Inicia o loop do jogo
+            gameLoop2();
+        }
+
+        function gameLoop2() {
+            if (!gameActive2) return;
+
+            // Spawna novos itens
+            spawnTimer2++;
+            if (spawnTimer2 > 50) { // Frequência de spawn
+                spawnTimer2 = 0;
+                const itemType = Math.random() > 0.2 ? '🍕' : '💣';
+                items2.push({
+                    x: Math.random() * (canvas2.width - 30),
+                    y: 0,
+                    size: 30,
+                    speed: Math.random() * 2 + 2,
+                    type: itemType
+                });
+            }
+
+            // Limpa o canvas
+            ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
+
+            // Desenha o jogador (caixa de pizza)
+            ctx2.fillStyle = '#d97706'; // bg-yellow-700
+            ctx2.fillRect(player2.x, player2.y, player2.width, player2.height);
+            ctx2.fillStyle = '#fef3c7'; // bg-yellow-100
+            ctx2.fillRect(player2.x + 10, player2.y + 5, player2.width - 20, player2.height - 10);
+
+            // Atualiza e desenha os itens
+            for (let i = items2.length - 1; i >= 0; i--) {
+                let item = items2[i];
+                item.y += item.speed;
+
+                // Desenha item
+                ctx2.font = `${item.size}px Arial`;
+                ctx2.fillText(item.type, item.x, item.y);
+
+                // Checa colisão
+                if (item.y + item.size > player2.y &&
+                    item.x > player2.x &&
+                    item.x + item.size < player2.x + player2.width) {
+                    
+                    if (item.type === '🍕') {
+                        score2 += 10;
+                        scoreDisplay2.textContent = score2;
+                    } else if (item.type === '💣') {
+                        endGame2(false); // Perdeu (pegou bomba)
+                    }
+                    items2.splice(i, 1); // Remove item
+                } 
+                // Remove se saiu da tela
+                else if (item.y > canvas2.height) {
+                    items2.splice(i, 1);
+                }
+            }
+
+            gameInterval2 = requestAnimationFrame(gameLoop2);
+        }
+
+        function endGame2(timeUp) {
+            gameActive2 = false;
+            stopAllGames(); // Para o requestAnimationFrame e o setInterval
+            finalScoreDisplay2.textContent = score2;
+            if (!timeUp) {
+                document.getElementById('game-2-over-screen').querySelector('h1').textContent = 'Você pegou uma Bomba!';
+            } else {
+                document.getElementById('game-2-over-screen').querySelector('h1').textContent = 'Tempo Esgotado!';
+            }
+            showScreen('game-2-over-screen');
+        }
+
+        function movePlayer2(x) {
+            let rect = canvas2.getBoundingClientRect();
+            let newX = x - rect.left - (player2.width / 2);
+            // Limita o jogador dentro do canvas
+            if (newX < 0) newX = 0;
+            if (newX + player2.width > canvas2.width) newX = canvas2.width - player2.width;
+            player2.x = newX;
+        }
+
+        // Event Listeners Jogo 2
+        canvas2.addEventListener('mousemove', (e) => movePlayer2(e.clientX));
+        canvas2.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            movePlayer2(e.touches[0].clientX);
+        });
+
+
+        // ===================================================================
+        // ======================== JOGO 3: JOGO DA MEMÓRIA ==================
+        // ===================================================================
+
+        const grid3 = document.getElementById('game-3-grid');
+        const pairsDisplay3 = document.getElementById('pairs3');
+        const triesDisplay3 = document.getElementById('tries3');
+        const messageDisplay3 = document.getElementById('game-3-message');
+        const finalTriesDisplay3 = document.getElementById('final-tries3');
+
+        const EMOJIS3 = ['🍕', '🍄', '🧅', '🧀', '🍅', '🫒'];
+        let cards3 = [];
+        let flippedCards3 = [];
+        let matchedPairs3 = 0;
+        let tries3 = 0;
+        let lockBoard3 = false;
+
+        function initGame3() {
+            grid3.innerHTML = '';
+            messageDisplay3.textContent = '';
+            cards3 = [];
+            flippedCards3 = [];
+            matchedPairs3 = 0;
+            tries3 = 0;
+            lockBoard3 = false;
+            
+            pairsDisplay3.textContent = '0 / 6';
+            triesDisplay3.textContent = '0';
+
+            // Cria e embaralha as cartas
+            let cardSet = [...EMOJIS3, ...EMOJIS3];
+            cardSet.sort(() => 0.5 - Math.random());
+
+            cardSet.forEach(emoji => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.dataset.emoji = emoji;
+                card.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-face card-front">❔</div>
+                        <div class="card-face card-back">${emoji}</div>
+                    </div>
+                `;
+                card.addEventListener('click', () => flipCard3(card));
+                grid3.appendChild(card);
+                cards3.push(card);
+            });
+        }
+
+        function flipCard3(card) {
+            if (lockBoard3) return;
+            if (card === flippedCards3[0]) return;
+            if (card.classList.contains('matched')) return;
+
+            card.classList.add('flipped');
+
+            if (flippedCards3.length === 0) {
+                flippedCards3.push(card);
+                return;
+            }
+
+            flippedCards3.push(card);
+            lockBoard3 = true; // Trava o tabuleiro enquanto checa
+            tries3++;
+            triesDisplay3.textContent = tries3;
+
+            checkForMatch3();
+        }
+
+        function checkForMatch3() {
+            let [card1, card2] = flippedCards3;
+            let isMatch = card1.dataset.emoji === card2.dataset.emoji;
+
+            if (isMatch) {
+                disableCards3(card1, card2);
+            } else {
+                unflipCards3(card1, card2);
+            }
+        }
+
+        function disableCards3(card1, card2) {
+            card1.classList.add('matched');
+            card2.classList.add('matched');
+            matchedPairs3++;
+            pairsDisplay3.textContent = `${matchedPairs3} / 6`;
+            resetBoard3();
+            
+            if (matchedPairs3 === EMOJIS3.length) {
+                endGame3();
+            }
+        }
+
+        function unflipCards3(card1, card2) {
+            setTimeout(() => {
+                card1.classList.remove('flipped');
+                card2.classList.remove('flipped');
+                resetBoard3();
+            }, 1000);
+        }
+
+        function resetBoard3() {
+            [flippedCards3, lockBoard3] = [[], false];
+        }
+
+        function endGame3() {
+            messageDisplay3.textContent = 'Você Venceu!';
+            finalTriesDisplay3.textContent = tries3;
+            setTimeout(() => {
+                showScreen('game-3-over-screen');
+            }, 1000);
+        }
+
+    </script>
+</body>
+</html>
+
+ye devpost doesnt allow them, sorry bro
